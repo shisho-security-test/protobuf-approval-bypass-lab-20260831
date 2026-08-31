@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
 set -euo pipefail
-printf 'PAYLOAD_A_REVIEWED\n'
+printf 'PAYLOAD_B_UNREVIEWED\n'

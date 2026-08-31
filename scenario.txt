@@ -1,1 +1,1 @@
-Controlled fork pull request used for SHA-binding verification.
+Controlled replacement commit prepared after SHA A was reviewed.
