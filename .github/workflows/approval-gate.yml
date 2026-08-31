@@ -1,0 +1,67 @@
+name: Approval Gate Lab
+
+on:
+  pull_request_target:
+    types: [labeled, opened, reopened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    if: github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    outputs:
+      checkout-sha: ${{ steps.pin.outputs.sha }}
+    steps:
+      - name: Require the one-shot safety label event
+        env:
+          EVENT_ACTION: ${{ github.event.action }}
+          EVENT_LABEL: ${{ github.event.label.name }}
+        run: |
+          if [[ "$EVENT_ACTION" != "labeled" || "$EVENT_LABEL" != ":a: safe for tests" ]]; then
+            echo "GATE_RESULT=blocked"
+            exit 1
+          fi
+          echo "GATE_RESULT=passed"
+
+      - name: Pin the event's current pull-request head
+        id: pin
+        env:
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          echo "sha=$EVENT_HEAD_SHA" >> "$GITHUB_OUTPUT"
+          echo "EVENT_HEAD_SHA=$EVENT_HEAD_SHA"
+
+  execute-fork-code:
+    needs: gate
+    runs-on: ubuntu-latest
+    env:
+      LAB_DUMMY_SECRET: ${{ secrets.LAB_DUMMY_SECRET }}
+      EVENT_HEAD_SHA: ${{ needs.gate.outputs.checkout-sha }}
+    steps:
+      - name: Checkout the fork head selected by the label event
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ needs.gate.outputs.checkout-sha }}
+
+      - name: Execute the selected fork payload with inherited lab secret
+        run: |
+          checked_out_sha=$(git rev-parse HEAD)
+          test "$checked_out_sha" = "$EVENT_HEAD_SHA"
+          test -n "$LAB_DUMMY_SECRET"
+          payload_result=$(./payload.sh)
+          {
+            echo "EVENT_HEAD_SHA=$EVENT_HEAD_SHA"
+            echo "CHECKED_OUT_SHA=$checked_out_sha"
+            echo "DUMMY_SECRET_PRESENT=yes"
+            echo "PAYLOAD_RESULT=$payload_result"
+          } | tee evidence.txt
+
+      - name: Publish concise evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: approval-gate-evidence
+          path: evidence.txt
+
