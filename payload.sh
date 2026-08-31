@@ -1,4 +1,3 @@
 #!/usr/bin/env bash
 set -euo pipefail
-printf 'PAYLOAD_A\n'
-
+printf 'PAYLOAD_A_REVIEWED\n'
