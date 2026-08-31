@@ -7,6 +7,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.event_name }}-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ contains(fromJSON('["pull_request", "pull_request_target", "workflow_dispatch", "schedule"]'), github.event_name) }}
+
 jobs:
   gate:
     if: github.event.pull_request.head.repo.full_name != github.repository
@@ -16,9 +20,13 @@ jobs:
     steps:
       - name: Require the one-shot safety label event
         env:
+          EVENT_ACTOR: ${{ github.actor }}
           EVENT_ACTION: ${{ github.event.action }}
           EVENT_LABEL: ${{ github.event.label.name }}
         run: |
+          echo "EVENT_ACTOR=$EVENT_ACTOR"
+          echo "EVENT_ACTION=$EVENT_ACTION"
+          echo "EVENT_LABEL=$EVENT_LABEL"
           if [[ "$EVENT_ACTION" != "labeled" || "$EVENT_LABEL" != ":a: safe for tests" ]]; then
             echo "GATE_RESULT=blocked"
             exit 1
